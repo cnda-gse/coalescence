@@ -200,4 +200,4 @@ pub struct AstroData {
 
 ## License
 
-[MIT](LICENSE)
+[GPLv3](LICENSE)
