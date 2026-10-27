@@ -1,0 +1,17 @@
+# Rust build artifacts
+/target/
+
+# IDE and editor configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# Generated receipt previews
+output.png
+receipt_output.png
