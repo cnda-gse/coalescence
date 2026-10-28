@@ -38,6 +38,9 @@ use std::env;
 use std::fs;
 use std::io::Cursor;
 use std::sync::OnceLock;
+use std::thread::sleep;
+use std::time::Duration;
+use spinners::{Spinner, Spinners};
 
 // Embedded fonts available everywhere across modules
 pub static UNIFONT_BYTES: &[u8] = include_bytes!("../fonts/UnifontExMono.ttf");
@@ -72,17 +75,17 @@ pub struct Config {
 #[derive(Debug, Deserialize)]
 pub struct Profile {
     pub location: String,
-    pub width: u32,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Template {
+    pub width: u32,
     pub content: String,
 }
 
 fn main() -> std::io::Result<()> {
     println!("
-    coalescence Copyright (C) 2026  Devon Shelton
+    coalescence Copyright (C) 2026 Devon Shelton
     This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are welcome to redistribute it under certain conditions.
     ");
     let args: Vec<String> = env::args().collect();
@@ -93,20 +96,29 @@ fn main() -> std::io::Result<()> {
 
     let file_path = &args[1];
     let config = read_toml(file_path);
-    CONFIG.set(config).expect("LOG ] Failed to set CONFIG");
+    CONFIG.set(config).expect("ERROR ] Failed to set CONFIG!");
 
     // Resolve geographic coordinates for location in profile
     let loc_str = &CONFIG.get().unwrap().profile.location;
+
+    println!("\
+    LOG ] Templating with following configuration:
+    WIDTH: {}px
+    DEFAULT LOCATION: {}", &(CONFIG.get().unwrap()).template.width, loc_str);
+
+    let mut sp = Spinner::new(Spinners::Dots9, "Resolving location...".into());
+
     let (lat, lon, tz) = match weather::fetch_location(loc_str) {
         Ok(geo) => {
-            println!("LOG ] Resolved profile location '{}': ({:.2}, {:.2}), tz: {:?}", loc_str, geo.latitude, geo.longitude, geo.timezone);
+            sp.stop_and_persist("LOG ]", format!("Resolved \"{}\" as ({:.2}), ({:.2})", loc_str, geo.latitude, geo.longitude));
             (geo.latitude, geo.longitude, geo.timezone)
         }
         Err(e) => {
-            eprintln!("LOG ] Could not geocode location '{}': {}. Defaulting to (52.52, 13.405).", loc_str, e);
+            sp.stop_and_persist("ERR ]", format!("Could not resolve \"{}\"; {}!", loc_str, e));
             (52.52, 13.405, None)
         }
     };
+
     COORDS.set((lat, lon, tz)).expect("LOG ] Failed to set COORDS");
 
     // Initialize Macro Registry with parameter support
@@ -123,7 +135,7 @@ fn main() -> std::io::Result<()> {
     let tokens = tokenize(template, &image_macros, &text_macros);
 
     // Draw dynamic image canvas sized to content
-    let _img = draw_image(tokens, &(CONFIG.get().unwrap()).profile.width);
+    let _img = draw_image(tokens, &(CONFIG.get().unwrap()).template.width);
 
     //print_image(_img).expect("TODO: printer error handling");
 
@@ -164,7 +176,7 @@ fn get_weather(args: &[&str]) -> GrayImage {
             weather::generate_with_coords(geo.latitude, geo.longitude, loc_str)
         }
         Err(e) => {
-            eprintln!("LOG ] WEATHER failed to geocode '{}': {}", loc_str, e);
+            eprintln!("ERROR ] WEATHER failed to geocode '{}': {}!", loc_str, e);
             let (lat, lon, _) = COORDS.get().unwrap();
             weather::generate_with_coords(*lat, *lon, loc_str)
         }
@@ -185,7 +197,7 @@ fn get_astro(args: &[&str]) -> GrayImage {
             astro::generate(geo.latitude, geo.longitude, geo.timezone.as_deref())
         }
         Err(e) => {
-            eprintln!("LOG ] ASTRO failed to geocode '{}': {}", loc_str, e);
+            eprintln!("ERROR ] ASTRO failed to geocode '{}': {}!", loc_str, e);
             let (lat, lon, tz) = COORDS.get().unwrap();
             astro::generate(*lat, *lon, tz.as_deref())
         }
@@ -254,7 +266,7 @@ impl Margin {
 fn get_image(args: &[&str]) -> GrayImage {
     if args.is_empty() {
         eprintln!("LOG ] !image macro requires at least one argument (file path)");
-        let mut err_img = GrayImage::from_pixel((CONFIG.get().unwrap()).profile.width, 40, Luma([255]));
+        let mut err_img = GrayImage::from_pixel((CONFIG.get().unwrap()).template.width, 40, Luma([255]));
         let font = FontRef::try_from_slice(UNIFONT_BYTES).expect("Failed to load embedded font");
         draw_text_mut(&mut err_img, Luma([0]), 10, 10, PxScale::from(16.0), &font, "LOG ] ..ERROR.. !image requires a path");
         return err_img;
@@ -263,7 +275,7 @@ fn get_image(args: &[&str]) -> GrayImage {
     let path = args[0];
     let margin = Margin::parse(&args[1..]);
 
-    let canvas_width = (CONFIG.get().unwrap()).profile.width;
+    let canvas_width = (CONFIG.get().unwrap()).template.width;
     let available_width = canvas_width.saturating_sub(margin.left + margin.right).max(1);
 
     match image::open(path) {
@@ -392,15 +404,19 @@ fn tokenize(
                 if tag_name.starts_with('!') {
                     // Call image macro with arguments
                     if let Some(macro_func) = image_macros.get(tag_name) {
+                        println!("LOG ] Image macro \"{}\" called with args; \"{}\"", tag_name.to_uppercase(), tag_args.join(" "));
                         tokens.push(Token::DynamicImage(macro_func(&tag_args)));
                     } else {
+                        println!("LOG ] Bad image macro call found: {{{{ {} }}}}, ignoring", tag_content);
                         tokens.push(Token::Text(format!("{{{{ {} }}}}", tag_content)));
                     }
                 } else if tag_name.starts_with('#') {
                     // Call text macro with arguments
                     if let Some(macro_func) = text_macros.get(tag_name) {
+                        println!("LOG ] Text macro \"{}\" called with args; \"{}\"", tag_name.to_uppercase(), tag_args.join(" "));
                         tokens.push(Token::Text(macro_func(&tag_args)));
                     } else {
+                        println!("LOG ] Bad text macro call found: {{{{ {} }}}}, ignoring", tag_content);
                         tokens.push(Token::Text(format!("{{{{ {} }}}}", tag_content)));
                     }
                 } else {
@@ -445,6 +461,7 @@ fn tokenize(
                         }
                         _ => {
                             tokens.push(Token::Text(format!("{{{{ {} }}}}", tag_content)));
+                            println!("LOG ] Bad style tag found: {{{{ {} }}}}, ignoring.", tag_content)
                         }
                     }
                 }
@@ -514,8 +531,8 @@ fn draw_image(tokens: Vec<Token>, &img_x: &u32) -> GrayImage {
     let total_y = measure_canvas_height(&tokens);
     let mut img = GrayImage::from_pixel(img_x, total_y, Luma([255]));
 
-    let base_font = FontRef::try_from_slice(UNIFONT_BYTES).expect("LOG ] Failed to load base font");
-    let upper_font = FontRef::try_from_slice(UNIFONT_UPPER_BYTES).expect("LOG ] Failed to load upper font");
+    let base_font = FontRef::try_from_slice(UNIFONT_BYTES).expect("ERR ] Failed to load base font; invalid font!");
+    let upper_font = FontRef::try_from_slice(UNIFONT_UPPER_BYTES).expect("ERR ] Failed to load upper font; invalid font!",);
 
     let mut is_bold = false;
     let mut is_underline = false;
@@ -655,8 +672,8 @@ fn draw_image(tokens: Vec<Token>, &img_x: &u32) -> GrayImage {
     }
 
     match save_buffer_with_format("output.png", img.as_raw(), img_x, total_y, L8, Png) {
-        Ok(_) => println!("LOG ] Successfully saved output.png ({}x{} px)!", img_x, total_y),
-        Err(e) => println!("LOG ] Failed to save image {}", e),
+        Ok(_) => println!("LOG ] Successfully saved output.png ({}x{} px)", img_x, total_y),
+        Err(e) => println!("ERR ] Failed to save image {}!", e),
     }
 
     img
@@ -675,7 +692,7 @@ fn print_image(img: GrayImage) -> Result<()> {
         let mut png = Cursor::new(Vec::new());
         DynamicImage::ImageLuma8(band)
             .write_to(&mut png, Png)
-            .expect("LOG ] Failed to encode image band");
+            .expect("ERROR ] Failed to encode image band!");
 
         printer
             .bit_image_from_bytes_option(

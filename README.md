@@ -18,7 +18,7 @@ It is designed primarily for use with ESC/POS thermal printers. However, as the 
 
 
 - **Near-Complete Unicode Coverage**  
-  Embedded with [**UnifontEX**](https://github.com/stgiga/UnifontEX) and [**Unifont Upper**](https://unifoundry.com/unifont/index.html) 18.0.01. Every box-drawing border, esoteric script, mathematical symbol, arrow, and ASCII art snippet *should* print crisply without missing glyphs.
+  Embedded with [**UnifontEX**](https://github.com/stgiga/UnifontEX) Mono and [**Unifont Upper**](https://unifoundry.com/unifont/index.html) 18.0.01. Every box-drawing border, esoteric script, mathematical symbol, arrow, and ASCII art snippet *should* print crisply without missing glyphs.
 
 
 - **Live Astrometry & Space Weather**  
@@ -82,9 +82,9 @@ Reports are configured through `config.toml`:
 ```toml
 [profile]
 location = "Seattle, WA"
-width = 512
 
 [template]
+width = 512
 content = '''
 ┌──────────────────────────────────────────────────────────────┐
 {{ height 4}}│{{width 4}}{{bold}}coalescence{{\bold}}{{width 1}}                  │{{height 1}}
