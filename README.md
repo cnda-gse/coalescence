@@ -82,9 +82,9 @@ Reports are configured through `config.toml`:
 ```toml
 [profile]
 location = "Seattle, WA"
-width = 512
 
 [template]
+width = 512
 content = '''
 ┌──────────────────────────────────────────────────────────────┐
 {{ height 4}}│{{width 4}}{{bold}}coalescence{{\bold}}{{width 1}}                  │{{height 1}}
