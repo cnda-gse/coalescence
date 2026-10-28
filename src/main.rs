@@ -102,24 +102,23 @@ fn main() -> std::io::Result<()> {
     let loc_str = &CONFIG.get().unwrap().profile.location;
 
     println!("\
-    LOG ] Constructing with following configuration:
+    LOG ] Templating with following configuration:
     WIDTH: {}px
     DEFAULT LOCATION: {}", &(CONFIG.get().unwrap()).template.width, loc_str);
 
     let mut sp = Spinner::new(Spinners::Dots9, "Resolving location...".into());
-    sleep(Duration::from_secs(3));
 
     let (lat, lon, tz) = match weather::fetch_location(loc_str) {
         Ok(geo) => {
-            sp.stop_and_persist(">", format!("Resolved \"{}\" as ({:.2}), ({:.2})", loc_str, geo.latitude, geo.longitude));
-            sleep(Duration::from_secs(2));
+            sp.stop_and_persist("LOG ]", format!("Resolved \"{}\" as ({:.2}), ({:.2})", loc_str, geo.latitude, geo.longitude));
             (geo.latitude, geo.longitude, geo.timezone)
         }
         Err(e) => {
-            eprintln!("ERROR ] Could not resolve \"{}\"': {}!", loc_str, e);
+            sp.stop_and_persist("ERR ]", format!("Could not resolve \"{}\"; {}!", loc_str, e));
             (52.52, 13.405, None)
         }
     };
+
     COORDS.set((lat, lon, tz)).expect("LOG ] Failed to set COORDS");
 
     // Initialize Macro Registry with parameter support
@@ -405,17 +404,19 @@ fn tokenize(
                 if tag_name.starts_with('!') {
                     // Call image macro with arguments
                     if let Some(macro_func) = image_macros.get(tag_name) {
+                        println!("LOG ] Image macro \"{}\" called with args; \"{}\"", tag_name.to_uppercase(), tag_args.join(" "));
                         tokens.push(Token::DynamicImage(macro_func(&tag_args)));
-                        println!("LOG ] Image macro \"{}\" called with the following args: \"{}\"", tag_name.to_uppercase(), tag_args.join(" "));
                     } else {
+                        println!("LOG ] Bad image macro call found: {{{{ {} }}}}, ignoring", tag_content);
                         tokens.push(Token::Text(format!("{{{{ {} }}}}", tag_content)));
                     }
                 } else if tag_name.starts_with('#') {
                     // Call text macro with arguments
                     if let Some(macro_func) = text_macros.get(tag_name) {
+                        println!("LOG ] Text macro \"{}\" called with args; \"{}\"", tag_name.to_uppercase(), tag_args.join(" "));
                         tokens.push(Token::Text(macro_func(&tag_args)));
-                        println!("LOG ] Text macro \"{}\" called with the following args: \"{}\"", tag_name.to_uppercase(), tag_args.join(" "));
                     } else {
+                        println!("LOG ] Bad text macro call found: {{{{ {} }}}}, ignoring", tag_content);
                         tokens.push(Token::Text(format!("{{{{ {} }}}}", tag_content)));
                     }
                 } else {
@@ -460,7 +461,7 @@ fn tokenize(
                         }
                         _ => {
                             tokens.push(Token::Text(format!("{{{{ {} }}}}", tag_content)));
-                            println!("LOG ] Bad tag found: {{{{ {} }}}}, ignoring.", tag_content)
+                            println!("LOG ] Bad style tag found: {{{{ {} }}}}, ignoring.", tag_content)
                         }
                     }
                 }
@@ -530,8 +531,8 @@ fn draw_image(tokens: Vec<Token>, &img_x: &u32) -> GrayImage {
     let total_y = measure_canvas_height(&tokens);
     let mut img = GrayImage::from_pixel(img_x, total_y, Luma([255]));
 
-    let base_font = FontRef::try_from_slice(UNIFONT_BYTES).expect("ERROR ] Failed to load base font!");
-    let upper_font = FontRef::try_from_slice(UNIFONT_UPPER_BYTES).expect("ERROR ] Failed to load upper font!");
+    let base_font = FontRef::try_from_slice(UNIFONT_BYTES).expect("ERR ] Failed to load base font; invalid font!");
+    let upper_font = FontRef::try_from_slice(UNIFONT_UPPER_BYTES).expect("ERR ] Failed to load upper font; invalid font!",);
 
     let mut is_bold = false;
     let mut is_underline = false;
@@ -671,8 +672,8 @@ fn draw_image(tokens: Vec<Token>, &img_x: &u32) -> GrayImage {
     }
 
     match save_buffer_with_format("output.png", img.as_raw(), img_x, total_y, L8, Png) {
-        Ok(_) => println!("LOG ] Successfully saved output.png ({}x{} px).", img_x, total_y),
-        Err(e) => println!("ERROR ] Failed to save image {}!", e),
+        Ok(_) => println!("LOG ] Successfully saved output.png ({}x{} px)", img_x, total_y),
+        Err(e) => println!("ERR ] Failed to save image {}!", e),
     }
 
     img
