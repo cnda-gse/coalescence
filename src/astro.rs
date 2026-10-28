@@ -444,7 +444,7 @@ pub fn generate_from_data(data: &AstroData) -> GrayImage {
     // 3. SPACE WEATHER & GEOMAGNETIC DATA
     // ==========================================
     y_offset += 75;
-    draw_text_mut(&mut img, black, 0, y_offset, scale_norm, &font, "├─────────────────── SPACE WEATHER & GEOMAGNETICS ────────────────────┤");
+    draw_text_mut(&mut img, black, 0, y_offset, scale_norm, &font, "├─────────────── SPACE WEATHER & GEOMAGNETICS ─────────────────┤");
     y_offset += 55;
 
     // 24-Hour Planetary Kp Index Graph
