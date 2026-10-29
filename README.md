@@ -4,6 +4,8 @@
 
 It is designed primarily for use with ESC/POS thermal printers. However, as the software directly outputs a plain PNG, it can be stored or printed on any medium.
 
+![example_output.png](examples/example_output.png)
+
 ---
 
 ## Highlights
@@ -36,8 +38,9 @@ It is designed primarily for use with ESC/POS thermal printers. However, as the 
 
 ## Templating Syntax
 
-Templates are written directly inside `config.toml` using a lightweight Jinja/Tera-inspired tag system:
+Templates are written directly inside `config.toml` using a lightweight Jinja/Tera-inspired tag system.
 
+*Style* tags add styling to all text within their respective opening and closing tags.
 ### Text Styling
 | Tag | Description |
 |---|---|
@@ -54,7 +57,7 @@ Templates are written directly inside `config.toml` using a lightweight Jinja/Te
 | `{{ height N }}` | Multiplies character height by `N` |
 
 ### Built-in Macros & Parameters
-Macro tags support optional parameters. Strings containing spaces can be enclosed in double or single quotes:
+Macro *call* tags support optional parameters. Strings containing spaces can be enclosed in double or single quotes:
 
 | Macro Tag | Type | Description |
 |---|---|---|
@@ -70,7 +73,7 @@ Macro tags support optional parameters. Strings containing spaces can be enclose
 ### Layout & Spacing Tokens
 | Tag | Description |
 |---|---|
-| `{{ vspace N }}` | Adds `N` pixels of vertical blank space (default: 16) |
+| `{{ vspace [N] }}` | Adds `N` pixels of vertical blank space (default: 16) |
 | `{{ hr [thickness] }}` | Draws a solid horizontal rule across the receipt (default: 1px) |
 
 ---
@@ -85,7 +88,7 @@ location = "Seattle, WA"
 
 [template]
 width = 512
-content = '''
+content = ''' # Type up your report below! In TOML, the first newline in a multiline literal is trimmed. Everything else is kept.
 ┌──────────────────────────────────────────────────────────────┐
 {{ height 4}}│{{width 4}}{{bold}}coalescence{{\bold}}{{width 1}}                  │{{height 1}}
 ├──────────────────────────────────────────────────────────────┤
@@ -117,8 +120,6 @@ content = '''
 cargo run -- config.toml
 ```
 
-You can view `output.png` in any image viewer.
-
 ### 2. Printing to Hardware
 To print directly to an ESC/POS USB thermal printer:
 1. Locate your printer's Vendor ID (VID) and Product ID (PID) using `lsusb` (e.g., `0x0519:0x0001`).
@@ -132,15 +133,15 @@ To print directly to an ESC/POS USB thermal printer:
 
 ```
 coalescence/
-├── Cargo.toml          # Package configuration & dependencies
-├── config.toml         # User profile and receipt layout template
-├── fonts/              # Embedded Unifont font assets
+├── Cargo.toml          
+├── config.toml         
+├── fonts/              
 │   ├── UnifontExMono.ttf
 │   └── unifont_upper-18.0.01.otf
 └── src/
-    ├── main.rs         # Engine, token parser, layout measurement & printing
-    ├── weather.rs      # OpenMeteo client, 24H chart & 5-day matrix table
-    └── astro.rs        # Ephemeris, NOAA SWPC ingestion & 24H Kp index graph
+    ├── main.rs         
+    ├── weather.rs      
+    └── astro.rs        
 ```
 
 ---
@@ -184,17 +185,19 @@ pub struct AstroData {
 
 ## Roadmap
 
-- [x] Dynamic canvas height (continuous roll rendering)
-- [x] Embedded Unifont assets (portable binaries without path dependencies)
-- [x] Live solar ephemeris via `sun`
-- [x] Live space weather & Kp gauge via NOAA SWPC
-- [x] 24-hour planetary Kp index chart (NOAA SWPC historical 3-hour series)
-- [x] Matrix-tabulated 5-day weather outlook
-- [x] Automatic coordinate and timezone resolution via OpenMeteo geocoding
-- [x] Parametrized macro tags (e.g. `{{ !weather "Tokyo" }}`)
-- [x] User-defined custom image macro with CSS-style margins (`{{ !image "path/to/asset.png" 10 20 }}`)
-- [x] Configurable canvas width in `config.toml` (`[profile.width]`)
-- [ ] Word-wrapping text blocks
+- [x] Implementing automatic coordinate and timezone resolution via OpenMeteo geocoding
+- [x] Implementing parametrized macro tags (e.g. `{{ !weather "Tokyo" }}`)
+- [x] Adding user-defined custom image macro with CSS-style margins (`{{ !image "path/to/asset.png" 10 20 }}`)
+- [x] Implementing configurable canvas width in `config.toml` (`[template.width]`)
+- [ ] Implementing word-wrapping text blocks
+- [ ] Implementing CSS Box-Model styling for inserted images (user or macro)
+- [ ] Adding Vertical line style tag (e.g. `{{ vr [width] }}`)
+- [ ] Adding JSON macro for pulling generic information to be extended by end-user
+- [ ] Extending `!astro` with optional satellite pass predictions
+- [ ] Extending `!image` with multiple dithering algorithms
+- [ ] Implementing alternate printer connections
+- [ ] Implementing custom macro scripting with [**Rhai**](https://github.com/rhaiscript/rhai)
+  - This would involve adjusting how `coalescence` handles call tags.
 
 ---
 
